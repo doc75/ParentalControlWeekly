@@ -118,12 +118,12 @@ for VICTIM in $VICTIMS; do
 	# STEP SIX
 	# Remind the VICTIM that he/she has $TIME_LEFT minute(s) left for the day.
 
-  DISP=0.0
+	DISP=:0.0
 
 	if [ $TIME_LEFT -lt 6 ]
 	then
 	  # Display a warning message on the victim's screen:
-	  sudo -u $VICTIM DISPLAY=$DISP notify-send -t 10000 -i gtk-info "Reminder:" "You have $TIME_LEFT minutes left for the day." &
+	  sudo -u $VICTIM DISPLAY=$DISP DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/`id -u $VICTIM`/bus notify-send -t 10000 -i gtk-info "Reminder:" "You have $TIME_LEFT minutes left for the week." &
 	  #  "Reminder:" "You have $TIME_LEFT minutes left for the day."
 	  # for French/français:
 	  #  "Rappel:" "Il te reste $TIME_LEFT minutes pour aujourd hui."

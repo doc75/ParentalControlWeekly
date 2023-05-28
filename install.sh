@@ -32,7 +32,7 @@ else
 	echo "limit-usage-time.sh not detected in cron, adding it..."
 	sudo crontab -l > /tmp/modified_crontab.cron
 	# Adding below line to run every minute:
-	echo 'MAILTO=' >> /tmp/modified_crontab.cron
+	echo 'MAILTO=""' >> /tmp/modified_crontab.cron
 	echo '* * * * * /root/pc_week/limit-usage-time.sh' >>/tmp/modified_crontab.cron
 	#echo '* * * * * /root/pc_week/limit-usage-time.sh >> /tmp/limit-usage-time.log 2>&1' >>/tmp/modified_crontab.cron
 	sudo crontab /tmp/modified_crontab.cron
