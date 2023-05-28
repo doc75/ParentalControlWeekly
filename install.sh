@@ -10,25 +10,31 @@
 # Description   : Installs the "Poor man's parental control" on the computer.
 
 set +x
+
 echo "- Install script for Parental Time Control -"
 echo
 echo "This script will copy files to the right place,"
 echo "configure your system and"
 echo "guide you through the simple configuration."
 echo
-sudo cp limit-usage-time.sh /root/ || echo "An ERROR or WARNING occurred when copying script to root folder!"
-sudo chmod u+x /root/limit-usage-time.sh || echo "An ERROR or WARNING occurred when setting execution rights on script!"
+if [ ! -d /root/pc_week/ ]
+then
+  sudo mkdir /root/pc_week/
+fi
+sudo cp limit-usage-time.sh /root/pc_week/ || echo "An ERROR or WARNING occurred when copying script to root folder!"
+sudo chmod u+x /root/pc_week/limit-usage-time.sh || echo "An ERROR or WARNING occurred when setting execution rights on script!"
 
 echo "Check if limit-usage-time.sh has already been added to cron:"
-sudo crontab -l | grep limit-usage-time.sh > nul
+sudo crontab -l | grep limit-usage-time.sh > /dev/null
 if [ "$?" == "0" ]; then
 	echo "Parental control script already in cron... Probably not the first time this install script is ran."
 else
 	echo "limit-usage-time.sh not detected in cron, adding it..."
 	sudo crontab -l > /tmp/modified_crontab.cron
 	# Adding below line to run every minute:
-	echo '* * * * * /root/limit-usage-time.sh' >>/tmp/modified_crontab.cron
-	#echo '* * * * * /root/limit-usage-time.sh >> /tmp/limit-usage-time.log 2>&1' >>/tmp/modified_crontab.cron
+	echo 'MAILTO=' >> /tmp/modified_crontab.cron
+	echo '* * * * * /root/pc_week/limit-usage-time.sh' >>/tmp/modified_crontab.cron
+	#echo '* * * * * /root/pc_week/limit-usage-time.sh >> /tmp/limit-usage-time.log 2>&1' >>/tmp/modified_crontab.cron
 	sudo crontab /tmp/modified_crontab.cron
 fi
 
@@ -39,13 +45,13 @@ echo "Known users of this machine:"
 echo $VICTIMS
 echo ""
 
-defaultadmin=`who am i | awk '{print $1}'`
+defaultadmin=`whoami | awk '{print $1}'`
 # workaround in case previous did not worked ( gnome-terminal issue )
 if [ "$defaultadmin" == "" ]; then
 	term=`tty`
 	defaultadmin=`ls -l $term | awk '{print $3}'`
 fi
-PREVIOUS_ADMIN=`sudo cat /root/parental_control_admin.cfg`
+PREVIOUS_ADMIN=`sudo cat /root/pc_week/parental_control_admin.cfg`
 if [ "PREVIOUS_ADMIN" != "" ]; then
 	echo "Information: '$PREVIOUS_ADMIN' as been previously informed as administrator."
 fi
@@ -54,7 +60,7 @@ if [ "$ADMIN" == "" ]; then
 	ADMIN=$defaultadmin
 fi
 sudo echo $ADMIN >/tmp/parental_control_admin.cfg
-sudo mv /tmp/parental_control_admin.cfg /root/parental_control_admin.cfg
+sudo mv /tmp/parental_control_admin.cfg /root/pc_week/parental_control_admin.cfg
 
 # creates configuration files in admin user's home folder:
 USERS_AND_TIMES_FILE=/home/$ADMIN/users_and_times.cfg
@@ -69,7 +75,7 @@ echo "What should be the time limit for each user, in minutes per day?"
 echo "- a default value of 60 minutes per day will be used if none informed -"
 echo "- if an user should not be limited, you may inform 9999 as limit -"
 for VICTIM in $VICTIMS; do
-	DEFAULT_TIME_LIMIT=60
+	DEFAULT_TIME_LIMIT=690
 	if [ "$VICTIM" == "$ADMIN" ]; then
 		DEFAULT_TIME_LIMIT=9999
 		echo "Note that $DEFAULT_TIME_LIMIT is informed for administrator in"
@@ -89,7 +95,7 @@ sudo cp parentalcontrol_display_time.sh /usr/bin/
 sudo chmod 555 /usr/bin/parentalcontrol_display_time.sh
 
 echo
-which espeak >nul
+which espeak > /dev/null
 if [ "$?" != "0" ]; then
 	echo "The program 'espeak' is currently not installed."
 	echo "'espeak' is the speech synthesizer used to send an audio warning to user when his time comes to the end."

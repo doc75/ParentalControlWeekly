@@ -35,11 +35,12 @@ set -x
 
 # Some useful variables
 # ADMIN = login name of the computer's administrator.
-ADMIN=`cat /root/parental_control_admin.cfg`
+ADMIN=`cat /root/pc_week/parental_control_admin.cfg`
+DEFAULT_TIME=690 # 1h30 on week days + 2h on week-ends
 
 # Date- and time-keeping variables.
-TODAY=`date +%D`
-YESTERDAY=0
+WEEK=`date +%V`
+CUR_WEEK=0
 TIME_LEFT=0
 
 # Shortcuts to configuration files.
@@ -49,15 +50,15 @@ USERS_AND_TIMES_FILE=/home/$ADMIN/users_and_times.cfg
 #VICTIMS=`users`        # Issue: if user launches multiple terminals, he appears multiple times... (ssh in, …)
 #VICTIMS=`ps -aux | grep xinitrc | grep -v 'grep\|root\|$ADMIN' | cut -f 1 -d ' '` # By extracting user with X session
 #VICTIMS=`ps -aux | grep wm | grep -v "grep\|root\|$ADMIN" | cut -f 1 -d ' '` # By extracting users who started a Window Manager
-VICTIMS=`ps -axo user:32,args | grep /sbin/upstart | grep -v "grep\|root\|$ADMIN" | cut -f 1 -d ' '` # By extracting users who started a grafical session (users logged on with 'ssh -X' will NOT be detected)
+VICTIMS=`ps -axo user:32,args | grep xfce4-session | grep -v "grep\|root\|$ADMIN" | cut -f 1 -d ' '` # By extracting users who started a grafical session (users logged on with 'ssh -X' will NOT be detected)
 
 echo List of victims: $VICTIMS
 
 for VICTIM in $VICTIMS; do
 	echo "Starting victim $VICTIM ..."
 	# Shortcuts to configuration files.
-	ROLLOVER_DATE_FILE=/root/$VICTIM-rollover-date.cfg
-	TIME_LEFT_FILE=/root/$VICTIM-time-left.cfg
+	ROLLOVER_DATE_FILE=/root/pc_week/$VICTIM-rollover-date.cfg
+	TIME_LEFT_FILE=/root/pc_week/$VICTIM-time-left.cfg
 	TIME_LEFT_FILE_FOR_USER=/tmp/$VICTIM-time-left.cfg
 
 	# STEP ONE
@@ -79,11 +80,11 @@ for VICTIM in $VICTIMS; do
 
 	if [ ! -e "$ROLLOVER_DATE_FILE" -o ! -e "$TIME_LEFT_FILE" ]
 	then
-		echo $YESTERDAY > $ROLLOVER_DATE_FILE
+		echo $CUR_WEEK > $ROLLOVER_DATE_FILE
 		echo $TIME_LEFT > $TIME_LEFT_FILE
 		echo $TIME_LEFT > $TIME_LEFT_FILE_FOR_USER
 	else
-		YESTERDAY=`cat $ROLLOVER_DATE_FILE`
+		CUR_WEEK=`cat $ROLLOVER_DATE_FILE`
 		TIME_LEFT=`cat $TIME_LEFT_FILE`
 	fi
 
@@ -92,10 +93,10 @@ for VICTIM in $VICTIMS; do
 	# the else statement in STEP THREE
 
 	# STEP FIVE
-	# If $TODAY and $YESTERDAY do not match, either a new day already has begun
+	# If $WEEK and $CUR_WEEK do not match, either a new day already has begun
 	# or STEP THREE happened. If this is the case, re-set the configuration files.
 
-	if [ "$TODAY" != "$YESTERDAY" ]
+	if [ "$WEEK" != "$CUR_WEEK" ]
 	then
 		# Find out the allocated time for $VICTIM.  If $VICTIM's not found
 		# in the configuration file, defaults to zero.
@@ -103,13 +104,13 @@ for VICTIM in $VICTIMS; do
 		if [ -z $TIME_LEFT ]
 		then
 			# Default time left if not found in $USERS_AND_TIMES_FILE:
-			TIME_LEFT=60
+			TIME_LEFT=${DEFAULT_TIME}
 			# This may be the value used by guest sessions.
 			# Users of those sessions have the form "guest-abcdef" where abcdef is a random string.
 			# So that each new session has a new $TIME_LEFT as informed above.
 			# You may wish to disable guest account if using this script...
 		fi
-		echo $TODAY > $ROLLOVER_DATE_FILE
+		echo $WEEK > $ROLLOVER_DATE_FILE
 		echo $TIME_LEFT > $TIME_LEFT_FILE 
 		echo $TIME_LEFT > $TIME_LEFT_FILE_FOR_USER
 	fi
@@ -117,32 +118,25 @@ for VICTIM in $VICTIMS; do
 	# STEP SIX
 	# Remind the VICTIM that he/she has $TIME_LEFT minute(s) left for the day.
 
-	UPSTART_PID=`ps -axo pid,user:32,args | grep /sbin/upstart | grep $VICTIM | grep -v grep | awk '{print $1}'`
-	#Trying to get the DISPLAY from the arguments of the Window Manager:
-	DISP=`ps -aux | grep wm | grep ^$VICTIM | grep -v grep | tr -s ' ' | cut -f 13 -d ' '`
-	#if the upper line did not work, try an alternative method:
-	if [ -z $DISP ]
-	then
-		DISP=`cat /proc/$UPSTART_PID/environ 2>/dev/null | tr '\0' '\n' | grep '^DISPLAY=' | cut -d "=" -f 2`
-	fi
+  DISP=0.0
 
-	# Display a warning message on the victim's screen:
-	sudo -u $VICTIM DISPLAY=$DISP notify-send -t 10000 -i gtk-info "Reminder:" "You have $TIME_LEFT minutes left for the day." &
-	#  "Reminder:" "You have $TIME_LEFT minutes left for the day."
-	# for French/français:
-	#  "Rappel:" "Il te reste $TIME_LEFT minutes pour aujourd hui."
-
-	# Audio play a warning (so that if victim is in a full-screen game, he will hear the message)
-	# TODO I got problem 'unable to open slave' with all of the below: aplay (package alsa-utils), speaker-test, play (package sox),...
-	#aplay -N -c 31 /home/$ADMIN/ParentalControl_5mn_left.wav
-	#paplay /home/$ADMIN/ParentalControl_5mn_left.wav
-	#speaker-test -l 1 -t wav -r 44100 -w /home/$ADMIN/ParentalControl_5mn_left_mono.wav
-	#play /home/$ADMIN/ParentalControl_5mn_left_mono.wav
-	#mplayer /home/$ADMIN/ParentalControl_5mn_left_mono.wav
-	#sudo -u $VICTIM DISPLAY=$DISP cvlc --play-and-exit /home/$ADMIN/ParentalControl_5mn_left_mono.wav
-	#sudo -u $VICTIM DISPLAY=$DISP totem /home/$ADMIN/ParentalControl_5mn_left_mono.wav &
 	if [ $TIME_LEFT -lt 6 ]
 	then
+	  # Display a warning message on the victim's screen:
+	  sudo -u $VICTIM DISPLAY=$DISP notify-send -t 10000 -i gtk-info "Reminder:" "You have $TIME_LEFT minutes left for the day." &
+	  #  "Reminder:" "You have $TIME_LEFT minutes left for the day."
+	  # for French/français:
+	  #  "Rappel:" "Il te reste $TIME_LEFT minutes pour aujourd hui."
+
+	  # Audio play a warning (so that if victim is in a full-screen game, he will hear the message)
+	  # TODO I got problem 'unable to open slave' with all of the below: aplay (package alsa-utils), speaker-test, play (package sox),...
+	  #aplay -N -c 31 /home/$ADMIN/ParentalControl_5mn_left.wav
+	  #paplay /home/$ADMIN/ParentalControl_5mn_left.wav
+	  #speaker-test -l 1 -t wav -r 44100 -w /home/$ADMIN/ParentalControl_5mn_left_mono.wav
+	  #play /home/$ADMIN/ParentalControl_5mn_left_mono.wav
+	  #mplayer /home/$ADMIN/ParentalControl_5mn_left_mono.wav
+	  #sudo -u $VICTIM DISPLAY=$DISP cvlc --play-and-exit /home/$ADMIN/ParentalControl_5mn_left_mono.wav
+	  #sudo -u $VICTIM DISPLAY=$DISP totem /home/$ADMIN/ParentalControl_5mn_left_mono.wav &
 		espeak -v english "Remaining $TIME_LEFT minutes left."
 		#espeak -v french "Il reste $TIME_LEFT minutes."
 	fi
@@ -163,7 +157,7 @@ for VICTIM in $VICTIMS; do
 		echo "Time expired for user $VICTIM , we lock screen or logout."
 
 		# The most generic way to force-close the session:
-		sudo -u $VICTIM kill -15 $UPSTART_PID
+		sudo -u $VICTIM DISPLAY=$DISP kill `ps -ef | grep xfce4-session | grep -v grep | grep ^$VICTIM | tr -s ' ' | cut -f 2 -d ' '`  
 
 		# Killing the session:
 		# Works with Xfce4, replace 'xfce4-session' with approppriate one to adapt for the others:
