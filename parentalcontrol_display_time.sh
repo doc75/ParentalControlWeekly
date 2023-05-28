@@ -18,17 +18,24 @@ VICTIM=$USER
 TIME_LEFT_FILE_FOR_USER=/tmp/$VICTIM-time-left.cfg
 TIME_LEFT=`cat $TIME_LEFT_FILE_FOR_USER`
 
+STR_REM_HOUR=$((TIME_LEFT / 60))
+STR_REM_MIN=$((TIME_LEFT % 60))
+if [ $STR_REM_HOUR -eq 0 ]
+then
+  STR_REM="$STR_REM_MIN minute(s)"
+else
+  STR_REM="$STR_REM_HOUR h $STR_REM_MIN minute(s)"
+fi
 STR_REM_TIME="Remaining time:"
-STR_MIN_LEFT="$TIME_LEFT minutes\n left for today."
+STR_MIN_LEFT="$STR_REM\nleft for the week."
 if [ "${LANG:0:2}" == "fr" ]
 then
 	STR_REM_TIME="Temps restant:"
-	STR_MIN_LEFT="$TIME_LEFT minutes\n pour aujourd hui."
+	STR_MIN_LEFT="$STR_REM\npour la semaine."
 fi
 
 echo "User $USER"
 echo "$STR_REM_TIME"
 echo "$STR_MIN_LEFT"
-notify-send -i gtk-info "$STR_REM_TIME" "$STR_MIN_LEFT"
-# -t 10000
+notify-send -t 10000 -i gtk-info "$STR_REM_TIME" "$STR_MIN_LEFT"
 
